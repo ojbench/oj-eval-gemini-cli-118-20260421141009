@@ -21,11 +21,12 @@ inline _Tp gcd(_Tp x, _Tp y) {
 }
 
 template <typename _Tp>
-inline _Tp fast_pow(_Tp x, long long y) {
+inline _Tp fast_pow(_Tp x, unsigned long long y) {
     _Tp res = 1;
     while (y) {
         if (y & 1) res *= x;
-        void(x *= x), y >>= 1;
+        x *= x;
+        y >>= 1;
     } return res;
 }
 
@@ -56,17 +57,27 @@ public:
     fraction(_Tp x, _Tp y) : num(x), den(y) { normalize(); }
 
     fraction operator + (const fraction &other) const {
-        return fraction(num * other.den + other.num * den, den * other.den);
+        _Tp g = gcd(den, other.den);
+        _Tp res_num = num * (other.den / g) + other.num * (den / g);
+        _Tp res_den = (den / g) * other.den;
+        return fraction(res_num, res_den);
     }
     fraction operator - (const fraction &other) const {
-        return fraction(num * other.den - other.num * den, den * other.den);
+        _Tp g = gcd(den, other.den);
+        _Tp res_num = num * (other.den / g) - other.num * (den / g);
+        _Tp res_den = (den / g) * other.den;
+        return fraction(res_num, res_den);
     }
     fraction operator * (const fraction &other) const {
-        return fraction(num * other.num, den * other.den);
+        _Tp g1 = gcd(num < 0 ? -num : num, other.den);
+        _Tp g2 = gcd(other.num < 0 ? -other.num : other.num, den);
+        return fraction((num / g1) * (other.num / g2), (den / g2) * (other.den / g1));
     }
     fraction operator / (const fraction &other) const {
         if (other.num == 0) throw divided_by_zero();
-        return fraction(num * other.den, den * other.num);
+        _Tp g1 = gcd(num < 0 ? -num : num, other.num < 0 ? -other.num : other.num);
+        _Tp g2 = gcd(den, other.den);
+        return fraction((num / g1) * (other.den / g2), (den / g2) * (other.num / g1));
     }
     fraction operator ^ (long long exp) const {
         if (exp == 0) return fraction(1);
@@ -75,35 +86,27 @@ public:
             return fraction(0);
         }
         if (exp > 0) {
-            return fraction(fast_pow(num, exp), fast_pow(den, exp));
+            return fraction(fast_pow(num, (unsigned long long)exp), fast_pow(den, (unsigned long long)exp));
         } else {
-            return fraction(fast_pow(den, -exp), fast_pow(num, -exp));
+            unsigned long long uexp = -static_cast<unsigned long long>(exp);
+            return fraction(fast_pow(den, uexp), fast_pow(num, uexp));
         }
     }
 
     fraction &operator += (const fraction &other) {
-        num = num * other.den + other.num * den;
-        den = den * other.den;
-        normalize();
+        *this = *this + other;
         return *this;
     }
     fraction &operator -= (const fraction &other) {
-        num = num * other.den - other.num * den;
-        den = den * other.den;
-        normalize();
+        *this = *this - other;
         return *this;
     }
     fraction &operator *= (const fraction &other) {
-        num *= other.num;
-        den *= other.den;
-        normalize();
+        *this = *this * other;
         return *this;
     }
     fraction &operator /= (const fraction &other) {
-        if (other.num == 0) throw divided_by_zero();
-        num *= other.den;
-        den *= other.num;
-        normalize();
+        *this = *this / other;
         return *this;
     }
     fraction &operator ^= (long long exp) {
@@ -122,6 +125,8 @@ public:
         return a.num == b.num && a.den == b.den;
     }
     friend bool operator < (const fraction &a, const fraction &b) {
+        // Since den > 0, a/b < c/d <=> ad < bc
+        // We use the same guarantee that ad and bc are safe.
         return a.num * b.den < b.num * a.den;
     }
 
